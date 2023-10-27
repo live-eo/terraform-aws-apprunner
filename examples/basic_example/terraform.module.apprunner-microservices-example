@@ -1,0 +1,146 @@
+module "terraform-aws-apprunner" {
+  source = "../terraform-aws-apprunner"
+
+  extra_tags = {
+    Terraform = "true"
+  }
+  ecr_access_arn = "arn:aws:iam::************:role/app-runner-ecr-access-role"
+
+  app_runner_instance_arns = {
+    "service-1" = "arn:aws:iam::************:role/app-runner-service-1-instance-role" #Apprunner Instance roles to be assigned to the service respectively
+    "service-2" = "arn:aws:iam::************:role/app-runner-service-2-instance-role" #Apprunner Instance roles to be assigned to the service respectively
+  }
+
+  vpc_connector_configuration = {
+    vpc_connector_1 = {
+      egress_configuration = {
+        subnets         = ["<subnet-id1>", "<subnet-id1>"]
+        security_groups = ["<security_group-1>", "<security_group-2>"]
+      }
+    },
+    vpc_connector_2 = {
+      egress_configuration = {
+        subnets         = ["<subnet-id1>", "<subnet-id1>"]
+        security_groups = ["<security_group-1>", "<security_group-2>"]
+      }
+    }
+  }
+
+  auto_scaling_configurations = {
+    mini = {
+      name            = "mini"
+      max_concurrency = 20
+      max_size        = 5
+      min_size        = 1
+
+      tags = {
+        Type = "Mini"
+      }
+    }
+    medium = {
+      name            = "medium"
+      max_concurrency = 100
+      max_size        = 15
+      min_size        = 3
+
+      tags = {
+        Type = "Medium"
+      }
+    }
+    mega = {
+      name            = "mega"
+      max_concurrency = 200
+      max_size        = 25
+      min_size        = 5
+
+      tags = {
+        Type = "Mega"
+      }
+    }
+  }
+
+  services = {
+    service-1 = {
+      image_repository_type = "ECR"
+      service_name          = "service-1"
+      vpc_connector_name    = "vpc_connector_1"
+      repository_name       = "service-1"
+      auto_deployments_enabled = false    #Not GIT integration available for this module yet
+      image_identifier = {
+        ecr_repository_url = "************.dkr.ecr.<region>.amazonaws.com/<repository_name>"
+        image_tag          = "<image:tag>"
+      }
+      image_configuration = {
+        port = "8000"
+        runtime_environment_variables = {
+          "ENV_VAR1" = "value1"
+          "ENV_VAR2" = "value2"
+        }
+        runtime_environment_secrets = {
+          "ENV_VAR3"       = "<AWS:secret_arn>"
+          "ENV_VAR4"       = "<AWS:secret_arn>"
+        }
+        start_command = "/start/app"
+      }
+      instance_configuration = {
+        cpu    = "256"
+        memory = "512"
+      }
+      vpc_connector_configuration = {      #https://aws.amazon.com/blogs/containers/deep-dive-on-aws-app-runner-private-services/
+        egress_configuration = {
+          subnets         = ["<subnet-id1>", "<subnet-id2>"]
+          security_groups = ["<security_group-1>", "<security_group-2>"]
+        }
+      }
+      public_endpoint = true #false means this service will be private endpint, That is from only within an Amazon VPC provided VPC endpoint is set
+      observability   = false #https://docs.aws.amazon.com/apprunner/latest/dg/manage-configure-observability.html?icmpid=docs_apprunner_console
+      health_check_configuration = {
+        healthy_threshold   = 1
+        unhealthy_threshold = 5
+        interval            = 5
+        path                = "/health"
+        protocol            = "HTTP"
+        timeout             = 2
+      }
+      autoscaling_config_name = "medium"
+    },
+    service-1 = {
+      image_repository_type = "ECR"
+      service_name          = "service-1"
+      vpc_connector_name    = "vpc_connector_2"
+      repository_name       = "service-1"
+      auto_deployments_enabled = false
+      image_identifier = {
+        ecr_repository_url = "************.dkr.ecr.<region>.amazonaws.com/<repository_name>"
+        image_tag          = "<image:tag>"
+      }
+      image_configuration = {
+        port = "8000"
+        runtime_environment_variables = {
+          "ENV_VAR1" = "example_value1"
+          "ENV_VAR2" = "example_value2"
+        }
+        runtime_environment_secrets = {
+          "ENV_VAR3"       = "<AWS:secret_arn>"
+          "ENV_VAR4"       = "<AWS:secret_arn>"
+        }
+        #start_command = "/start/app"  #This is an optional parameter which overwrites your Docker run command
+      }
+      instance_configuration = {
+        cpu    = "256"
+        memory = "512"
+      }
+      public_endpoint = true #true means this service will be public, this is the default behaivior
+      observability   = false #https://docs.aws.amazon.com/apprunner/latest/dg/manage-configure-observability.html?icmpid=docs_apprunner_console
+      health_check_configuration = {
+        healthy_threshold   = 1
+        unhealthy_threshold = 5
+        interval            = 5
+        path                = "/"
+        protocol            = "TCP"
+        timeout             = 2
+      }
+      autoscaling_config_name = "mini"
+    }
+  }
+}
